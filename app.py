@@ -121,6 +121,26 @@ st.markdown(
         margin: 0;
         line-height: 1.65;
     }
+
+    /* Google Maps link button */
+    div[data-testid="stLinkButton"] a {
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+        border: 1px solid #0f172a !important;
+    }
+
+    div[data-testid="stLinkButton"] a p {
+        color: #ffffff !important;
+    }
+
+    div[data-testid="stLinkButton"] a:hover {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+    }
+
+    div[data-testid="stLinkButton"] a:hover p {
+        color: #ffffff !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
