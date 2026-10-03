@@ -100,3 +100,7 @@ streamlit run app.py
 ## Stack
 
 Python · pandas · NumPy · LangChain · LangGraph · Google Gemini · Streamlit · Git
+
+## Development approach
+
+This project was developed as an AI-assisted learning project to strengthen my practical understanding of LangChain, LangGraph and LLM-based application development. AI tools supported implementation, troubleshooting and iteration while I worked through the workflow design, deterministic data analysis, scoring, Gemini integration and application behaviour.
