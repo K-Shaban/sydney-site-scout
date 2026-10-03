@@ -1,65 +1,65 @@
 # Sydney Site Scout
 
-AI-assisted location intelligence application for comparing Sydney business locations using real pedestrian activity data.
+Sydney Site Scout is a location analysis tool that compares potential business locations using real pedestrian activity data from the City of Sydney.
 
 ## Overview
 
-Sydney Site Scout analyses pedestrian activity across Sydney locations and ranks locations based on the requirements of a proposed business.
+The idea behind the project is simple: a good location depends on the type of business and when it expects customers to be around.
 
-The application combines deterministic data analysis with a small generative-AI layer:
+A user enters a business type and selects their expected trading hours and days. The application analyses pedestrian activity during those periods and ranks the available locations based on how well they fit the business.
 
-- Python and pandas process and analyse pedestrian count data.
-- Gemini interprets the proposed business and generates business-specific priorities.
-- Python calculates business-fit scores for each location.
-- LangGraph manages the analysis workflow and data-quality checks.
-- Gemini generates a concise business-facing decision brief.
-- Streamlit provides an interactive user interface.
+The application uses:
+
+- Python and pandas to process the pedestrian data and calculate location metrics.
+- Gemini to interpret the business and determine which location factors matter most.
+- Python to calculate and rank the business-fit scores.
+- LangGraph to manage the analysis workflow and data-quality checks.
+- Gemini to turn the final results into a short decision brief.
+- Streamlit to provide the user interface.
 
 ## Demo
 
-The application allows a user to describe a proposed business, select its trading hours and days, and compare locations based on pedestrian activity and business-specific priorities.
+The user enters the type of business they are considering and selects the days and hours they expect it to operate.
 
 ### Business Input
-
-The user enters a business type and selects the trading period to be analysed.
 
 ![Sydney Site Scout input](imgs/user-input.png)
 
 ### Location Analysis
 
-The application ranks the available locations and displays the recommended location, business-fit score, pedestrian metrics and an AI-generated decision brief.
+The application compares the available locations and returns the strongest match, its business-fit score, the underlying pedestrian metrics and a short AI-generated explanation.
 
 ![Sydney Site Scout result](imgs/user-response.png)
 
-The numerical ranking is calculated in Python using AI-generated business priorities, while Gemini provides a concise explanation of the results.
+The underlying metrics and scores are calculated in Python. Gemini is used to understand the business context and explain the results.
 
 ## Data
 
-The project uses City of Sydney pedestrian count data containing **188,720 observations** across four locations:
+The project uses City of Sydney pedestrian count data with **188,720 observations** across four locations:
 
 - Park Street
 - Market Street
 - Bridge Street
 - Elizabeth Street
 
-The data is filtered according to the user's selected trading hours and days.
+The data is filtered to the trading hours and days selected by the user.
 
-Location analysis includes:
+For each location, the application looks at:
 
-- **Average Pedestrian Activity** = Typical pedestrian volume during the selected period
-- **P95 Pedestrian Activity** = High pedestrian activity without relying on extreme maximum values
-- **Traffic Consistency** = Stability of pedestrian activity
-- **Weekday / Weekend Activity** = Activity patterns across trading days
-- **Recent Change** = Change in recent pedestrian activity
-- **Year-on-Year Change** = Change compared with the corresponding historical period
+- **Average Pedestrian Activity** — typical pedestrian volume during the selected period
+- **P95 Pedestrian Activity** — a measure of high foot traffic without relying on extreme maximum values
+- **Traffic Consistency** — how stable pedestrian activity is over time
+- **Weekday / Weekend Activity** — differences in traffic depending on the selected trading days
+- **Recent Change** — whether pedestrian activity has recently increased or decreased
+- **Year-on-Year Change** — how activity compares with the corresponding historical period
 
 ## Scoring
 
-Gemini converts the proposed business into business-specific priorities for factors including pedestrian demand, consistency, peak activity and historical trends.
+Gemini interprets the proposed business and assigns priorities to factors such as pedestrian demand, consistency, peak activity and historical trends.
 
-Python combines these priorities with deterministic location metrics to calculate a **0–100 business-fit score** and rank the available locations. Because the priorities are AI-generated, scores may vary slightly between otherwise identical runs.
+Python combines these priorities with the calculated location metrics to produce a **0–100 business-fit score** and rank the four locations.
 
-The AI does not directly calculate the location scores; scoring is performed in Python using the generated priorities.
+Because the business priorities are generated by an LLM, the scores can vary slightly between identical runs. Gemini does not calculate the scores itself; the numerical scoring is handled in Python.
 
 ## Workflow
 
@@ -83,10 +83,10 @@ Streamlit
 
 ## Key considerations
 
-- **Pedestrian activity ≠ customer demand:** Integrate demographic, transaction or mobility datasets to validate pedestrian-to-customer conversion.
-- **Relative scoring:** Calibrate and validate scores against historical site performance before using them as predictive measures.
-- **Limited commercial context:** Add rent, competitor density, demographics and zoning through external APIs or supplementary datasets.
-- **AI variability:** Replace AI-generated scoring weights with versioned deterministic business profiles, using Gemini only for interpretation.
+- **Foot traffic is not the same as customer demand.** A production version could combine pedestrian counts with demographic, transaction or mobility data to better estimate actual demand.
+- **The scores are relative, not predictions of success.** Historical site performance could be used to calibrate and validate the scoring model.
+- **Commercial factors are currently outside the dataset.** Rent, nearby competitors, demographics and zoning could be added through external APIs or additional datasets.
+- **AI-generated priorities can vary between runs.** These could be replaced with versioned business profiles and fixed scoring weights, leaving Gemini to explain the results rather than influence the score.
 
 ## Running locally
 
