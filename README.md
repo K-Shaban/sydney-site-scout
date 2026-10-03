@@ -10,7 +10,7 @@ The application combines deterministic data analysis with a small generative-AI 
 
 - Python and pandas process and analyse pedestrian count data.
 - Gemini interprets the proposed business and generates business-specific priorities.
-- Python calculates deterministic business-fit scores for each location.
+- Python calculates business-fit scores for each location.
 - LangGraph manages the analysis workflow and data-quality checks.
 - Gemini generates a concise business-facing decision brief.
 - Streamlit provides an interactive user interface.
@@ -31,7 +31,7 @@ The application ranks the available locations and displays the recommended locat
 
 ![Sydney Site Scout result](imgs/user-response.png)
 
-The numerical ranking is calculated in Python, while Gemini interprets the results and provides a concise explanation.
+The numerical ranking is calculated in Python using AI-generated business priorities, while Gemini provides a concise explanation of the results.
 
 ## Data
 
@@ -57,9 +57,9 @@ Location analysis includes:
 
 Gemini converts the proposed business into business-specific priorities for factors including pedestrian demand, consistency, peak activity and historical trends.
 
-Python then combines these priorities with deterministic location metrics to calculate a **0–100 business-fit score** and rank the available locations.
+Python combines these priorities with deterministic location metrics to calculate a **0–100 business-fit score** and rank the available locations. Because the priorities are AI-generated, scores may vary slightly between otherwise identical runs.
 
-The AI does not directly calculate or modify the location scores.
+The AI does not directly calculate the location scores; scoring is performed in Python using the generated priorities.
 
 ## Workflow
 
@@ -83,10 +83,10 @@ Streamlit
 
 ## Key considerations
 
-- Pedestrian activity does not necessarily represent customers or purchasing intent.
-- Business-fit scores compare the four available locations and are not probabilities of business success.
-- The analysis does not include rent, competition, demographics, zoning or revenue.
-- AI-generated insights explain the calculated results but do not determine the underlying location scores.
+- **Pedestrian activity ≠ customer demand:** Integrate demographic, transaction or mobility datasets to validate pedestrian-to-customer conversion.
+- **Relative scoring:** Calibrate and validate scores against historical site performance before using them as predictive measures.
+- **Limited commercial context:** Add rent, competitor density, demographics and zoning through external APIs or supplementary datasets.
+- **AI variability:** Replace AI-generated scoring weights with versioned deterministic business profiles, using Gemini only for interpretation.
 
 ## Running locally
 

@@ -17,70 +17,26 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    
+    /* Page */
     .stApp {
         background: #f7f9fc;
         color: #0f172a;
     }
-    .block-container { max-width: 1120px; padding-top: 2rem; padding-bottom: 4rem; }
 
-    .hero {
-        padding: 2.1rem 2.2rem;
-        margin-bottom: 1.4rem;
-        border-radius: 20px;
-        background: linear-gradient(135deg, #0f172a 0%, #172554 58%, #1e3a8a 100%);
-        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.13);
-    }
-    .eyebrow {
-        color: #93c5fd; font-size: .78rem; font-weight: 700;
-        letter-spacing: .12em; text-transform: uppercase; margin-bottom: .55rem;
-    }
-    .hero h1 { color: white; font-size: 2.65rem; letter-spacing: -.04em; margin: 0 0 .45rem 0; }
-    .hero p { color: #cbd5e1; font-size: 1.05rem; line-height: 1.65; max-width: 760px; margin: 0; }
-    .hero-badges { margin-top: 1.1rem; }
-    .badge {
-        display: inline-block; padding: .32rem .65rem; margin-right: .35rem;
-        border: 1px solid rgba(255,255,255,.16); border-radius: 999px;
-        color: #dbeafe; background: rgba(255,255,255,.07); font-size: .76rem;
+    .block-container {
+        max-width: 1120px;
+        padding-top: 2rem;
+        padding-bottom: 4rem;
     }
 
-    div[data-testid="stForm"] {
-        background: white; border: 1px solid #e2e8f0; border-radius: 18px;
-        padding: 1.35rem 1.45rem .55rem; box-shadow: 0 8px 30px rgba(15,23,42,.05);
-    }
-    div[data-testid="stForm"] label { font-weight: 600; color: #334155; }
-    div[data-testid="stTextInput"] input { border-radius: 10px; }
-    div[data-testid="stFormSubmitButton"] button {
-        min-height: 3rem; border-radius: 10px; font-weight: 700;
+    #MainMenu,
+    footer {
+        visibility: hidden;
     }
 
-    .result-card {
-        border: 1px solid #bfdbfe; border-radius: 16px; padding: 1.2rem 1.3rem;
-        background: linear-gradient(145deg, #eff6ff 0%, #ffffff 78%);
-        min-height: 148px; box-shadow: 0 8px 24px rgba(30,64,175,.06);
+    hr {
+        border-color: #e2e8f0 !important;
     }
-    .score { font-size: 2.15rem; font-weight: 800; line-height: 1.05; color: #0f172a; margin: .25rem 0; }
-    .muted { color: #64748b; font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-    .location-name { color: #1e3a8a; font-size: 1.05rem; font-weight: 700; margin-top: .35rem; }
-
-    div[data-testid="stMetric"] {
-        background: white; border: 1px solid #e2e8f0; padding: .9rem 1rem;
-        border-radius: 14px; min-height: 148px; box-shadow: 0 8px 24px rgba(15,23,42,.04);
-    }
-    div[data-testid="stMetricLabel"] { color: #64748b; }
-    div[data-testid="stMetricValue"] { color: #0f172a; }
-    div[data-testid="stDataFrame"] { border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
-
-    .empty-state {
-        background: white; border: 1px solid #e2e8f0; border-radius: 16px;
-        padding: 1.5rem 1.7rem; margin-top: .3rem;
-    }
-    .empty-state h3 { margin-top: 0; color: #0f172a; }
-    .empty-state p { color: #64748b; margin-bottom: 0; }
-
-    h2, h3 { color: #0f172a; letter-spacing: -.02em; }
-    hr { border-color: #e2e8f0 !important; }
-    #MainMenu, footer { visibility: hidden; }
 
     /* Standard Streamlit text */
     [data-testid="stMarkdownContainer"] p,
@@ -88,41 +44,158 @@ st.markdown(
         color: #334155;
     }
 
-    /* Headings */
     [data-testid="stMarkdownContainer"] h1,
     [data-testid="stMarkdownContainer"] h2,
     [data-testid="stMarkdownContainer"] h3,
     [data-testid="stMarkdownContainer"] h4 {
         color: #0f172a;
+        letter-spacing: -.02em;
     }
 
-    /* Captions */
     [data-testid="stCaptionContainer"],
     [data-testid="stCaptionContainer"] p {
         color: #64748b !important;
     }
 
-    /* AI decision brief */
-    .ai-brief {
-        background: #f8fafc;
+    /* Hero */
+    .hero {
+        padding: 2.1rem 2.2rem;
+        margin-bottom: 1.4rem;
+        border-radius: 20px;
+        background: linear-gradient(
+            135deg,
+            #0f172a 0%,
+            #172554 58%,
+            #1e3a8a 100%
+        );
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.13);
+    }
+
+    .hero .eyebrow {
+        color: #93c5fd !important;
+        font-size: .78rem;
+        font-weight: 700;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        margin-bottom: .55rem;
+    }
+
+    .hero h1 {
+        color: #ffffff !important;
+        font-size: 2.65rem;
+        letter-spacing: -.04em;
+        margin: 0 0 .45rem 0;
+    }
+
+    .hero p {
+        color: #cbd5e1 !important;
+        font-size: 1.05rem;
+        line-height: 1.65;
+        max-width: 760px;
+        margin: 0;
+    }
+
+    .hero-badges {
+        margin-top: 1.1rem;
+    }
+
+    .hero .badge {
+        display: inline-block;
+        padding: .32rem .65rem;
+        margin-right: .35rem;
+        border: 1px solid rgba(255, 255, 255, .16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .07);
+        color: #dbeafe !important;
+        font-size: .76rem;
+    }
+
+    /* Input form */
+    div[data-testid="stForm"] {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        padding: 1.35rem 1.45rem .55rem;
+        box-shadow: 0 8px 30px rgba(15, 23, 42, .05);
+    }
+
+    div[data-testid="stForm"] label {
+        color: #334155;
+        font-weight: 600;
+    }
+
+    div[data-testid="stTextInput"] input {
+        border-radius: 10px;
+    }
+
+    div[data-testid="stFormSubmitButton"] button {
+        min-height: 3rem;
+        border-radius: 10px;
+        font-weight: 700;
+    }
+
+    /* Result card */
+    .result-card {
+        min-height: 148px;
+        padding: 1.2rem 1.3rem;
+        border: 1px solid #bfdbfe;
+        border-radius: 16px;
+        background: linear-gradient(
+            145deg,
+            #eff6ff 0%,
+            #ffffff 78%
+        );
+        box-shadow: 0 8px 24px rgba(30, 64, 175, .06);
+    }
+
+    .score {
+        margin: .25rem 0;
+        color: #0f172a;
+        font-size: 2.15rem;
+        font-weight: 800;
+        line-height: 1.05;
+    }
+
+    .muted {
+        color: #64748b;
+        font-size: .78rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .location-name {
+        margin-top: .35rem;
+        color: #1e3a8a;
+        font-size: 1.05rem;
+        font-weight: 700;
+    }
+
+    /* Metrics and table */
+    div[data-testid="stMetric"] {
+        min-height: 148px;
+        padding: .9rem 1rem;
+        background: white;
         border: 1px solid #e2e8f0;
         border-radius: 14px;
-        padding: 18px 20px;
-        margin-top: 8px;
-        margin-bottom: 20px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
     }
 
-    .ai-brief,
-    .ai-brief p {
-        color: #334155 !important;
+    div[data-testid="stMetricLabel"] {
+        color: #64748b;
     }
 
-    .ai-brief p {
-        margin: 0;
-        line-height: 1.65;
+    div[data-testid="stMetricValue"] {
+        color: #0f172a;
     }
 
-    /* Google Maps link button */
+    div[data-testid="stDataFrame"] {
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+    }
+
+    /* Google Maps button */
     div[data-testid="stLinkButton"] a {
         background-color: #0f172a !important;
         color: #ffffff !important;
@@ -140,6 +213,42 @@ st.markdown(
 
     div[data-testid="stLinkButton"] a:hover p {
         color: #ffffff !important;
+    }
+
+    /* AI decision brief */
+    .ai-brief {
+        margin-top: 8px;
+        margin-bottom: 20px;
+        padding: 18px 20px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        color: #334155 !important;
+    }
+
+    .ai-brief p {
+        margin: 0;
+        color: #334155 !important;
+        line-height: 1.65;
+    }
+
+    /* Empty state */
+    .empty-state {
+        margin-top: .3rem;
+        padding: 1.5rem 1.7rem;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+    }
+
+    .empty-state h3 {
+        margin-top: 0;
+        color: #0f172a;
+    }
+
+    .empty-state p {
+        margin-bottom: 0;
+        color: #64748b;
     }
     </style>
     """,
