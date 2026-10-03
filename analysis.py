@@ -58,7 +58,7 @@ def _safe_change(current, baseline):
     return changes.mean()
 
 
-def analyse_locations(df, start_hour=7, end_hour=10, day="All"):
+def analyse_locations(df, start_hour=7, end_hour=10, selected_days=None):
     """
     Build location-level features for the selected trading window.
 
@@ -70,9 +70,9 @@ def analyse_locations(df, start_hour=7, end_hour=10, day="All"):
         & (df["Hour"] < end_hour)
     ].copy()
 
-    if day != "All":
-        filtered = filtered[filtered["Day"] == day]
-
+    if selected_days:
+        filtered = filtered[filtered["Day"].isin(selected_days)]
+        
     if filtered.empty:
         return []
 

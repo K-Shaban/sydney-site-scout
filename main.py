@@ -9,21 +9,51 @@ from langgraph.graph import StateGraph, START, END
 from analysis import load_data, analyse_locations
 
 
+# ---------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------
+
 load_dotenv()
 
-
 llm = ChatGoogleGenerativeAI(
-    model="gemini-3.7-flash",
+    model="gemini-3.8-flash",
     max_retries=3,
 )
 
+ALL_DAYS = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+]
+
+WEEKDAYS = {
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+}
+
+WEEKENDS = {
+    "Saturday",
+    "Sunday",
+}
+
+
+# ---------------------------------------------------------------------
+# LangGraph state
+# ---------------------------------------------------------------------
 
 class ScoutState(TypedDict):
     question: str
     business_type: str
     start_hour: int
     end_hour: int
-    day_filter: str
+    selected_days: list[str]
 
     business_profile: dict
     location_analysis: list
@@ -33,8 +63,12 @@ class ScoutState(TypedDict):
     report: str
 
 
+# ---------------------------------------------------------------------
+# LLM helpers
+# ---------------------------------------------------------------------
+
 def invoke_llm(prompt, attempts=2):
-    """Retry only the transient failures that can occur during API calls."""
+    """Retry transient failures that can occur during API calls."""
     last_error = None
 
     for attempt in range(attempts):
@@ -42,6 +76,7 @@ def invoke_llm(prompt, attempts=2):
             return llm.invoke(prompt)
         except Exception as error:
             last_error = error
+
             if attempt < attempts - 1:
                 time.sleep(2 ** attempt)
 
@@ -49,26 +84,57 @@ def invoke_llm(prompt, attempts=2):
 
 
 def response_text(response):
+    """Extract text safely from a LangChain model response."""
     content = response.content
 
+    if isinstance(content, str):
+        return content
+
     if isinstance(content, list):
-        return "".join(
-            block.get("text", "")
-            for block in content
-            if isinstance(block, dict) and block.get("type") == "text"
-        )
+        parts = []
+
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+
+            elif isinstance(block, dict):
+                text = block.get("text")
+
+                if text:
+                    parts.append(str(text))
+
+        return "".join(parts)
 
     return str(content)
 
 
+# ---------------------------------------------------------------------
+# 1. Understand the proposed business
+# ---------------------------------------------------------------------
+
 def understand_business(state: ScoutState):
+    """
+    Use Gemini to translate the business concept into analytical priorities.
+
+    Gemini provides business-specific importance weights.
+    It does not directly score or rank locations.
+    """
+
+    selected_days = ", ".join(state["selected_days"])
+
     prompt = f"""
 You are defining an analytical business profile for a Sydney location study.
 
-Business concept: {state["business_type"]}
-Trading period: {state["start_hour"]}:00-{state["end_hour"]}:00
+Business concept:
+{state["business_type"]}
 
-Return ONLY valid JSON:
+Trading period:
+{state["start_hour"]}:00-{state["end_hour"]}:00
+
+Selected trading days:
+{selected_days}
+
+Return ONLY valid JSON using this structure:
 
 {{
   "business_type": "...",
@@ -83,50 +149,76 @@ Return ONLY valid JSON:
   "risk_tolerance": "low|medium|high"
 }}
 
-Values must be between 0 and 1.
-The importance values do not need to sum to 1 because the application
-will normalise them before scoring.
-
-Use reasonable generic commercial assumptions.
-Do not make claims about particular Sydney locations.
+Rules:
+- All importance values must be between 0 and 1.
+- Importance values do not need to sum to 1.
+- The application will normalise the values before scoring.
+- Consider the selected trading days when assigning weekday and weekend importance.
+- Use reasonable generic commercial assumptions.
+- Do not make claims about particular Sydney locations.
+- Return JSON only.
 """
 
     response = invoke_llm(prompt)
-    content = response_text(response).replace("```json", "").replace("```", "").strip()
+
+    content = (
+        response_text(response)
+        .replace("```json", "")
+        .replace("```", "")
+        .strip()
+    )
 
     try:
         profile = json.loads(content)
-    except json.JSONDecodeError:
+
+    except (json.JSONDecodeError, TypeError):
+        # Deterministic fallback if Gemini does not return valid JSON.
         profile = {
             "business_type": state["business_type"],
             "primary_customer_period": "General",
             "weekday_importance": 0.5,
             "weekend_importance": 0.5,
-            "demand_importance": 0.3,
-            "consistency_importance": 0.2,
+            "demand_importance": 0.30,
+            "consistency_importance": 0.20,
             "peak_importance": 0.15,
             "trend_importance": 0.15,
-            "historical_importance": 0.2,
+            "historical_importance": 0.10,
             "risk_tolerance": "medium",
         }
 
-    return {"business_profile": profile}
+    return {
+        "business_profile": profile,
+    }
 
+
+# ---------------------------------------------------------------------
+# 2. Analyse pedestrian data
+# ---------------------------------------------------------------------
 
 def analyse_data(state: ScoutState):
+    """Run deterministic analysis for the selected trading period."""
+
     df = load_data()
 
     results = analyse_locations(
         df,
         start_hour=state["start_hour"],
         end_hour=state["end_hour"],
-        day=state["day_filter"],
+        selected_days=state["selected_days"],
     )
 
-    return {"location_analysis": results}
+    return {
+        "location_analysis": results,
+    }
 
+
+# ---------------------------------------------------------------------
+# 3. Assess data quality
+# ---------------------------------------------------------------------
 
 def assess_data_quality(state: ScoutState):
+    """Check whether enough observations exist for comparison."""
+
     results = state["location_analysis"]
 
     if not results:
@@ -139,7 +231,10 @@ def assess_data_quality(state: ScoutState):
             }
         }
 
-    total_observations = sum(row["observations"] for row in results)
+    total_observations = sum(
+        row["observations"]
+        for row in results
+    )
 
     sufficient = (
         len(results) >= 2
@@ -160,11 +255,21 @@ def assess_data_quality(state: ScoutState):
     }
 
 
+# ---------------------------------------------------------------------
+# 4. Score locations
+# ---------------------------------------------------------------------
+
 def score_locations(state: ScoutState):
+    """
+    Combine deterministic location metrics with business-specific priorities.
+
+    Gemini supplies the importance weights.
+    Python performs the actual scoring and ranking.
+    """
+
     results = state["location_analysis"]
     profile = state["business_profile"]
 
-    # These are business preferences, not probabilities.
     raw_weights = {
         "demand": profile.get("demand_importance", 0.30),
         "consistency": profile.get("consistency_importance", 0.20),
@@ -175,14 +280,34 @@ def score_locations(state: ScoutState):
         "weekend": profile.get("weekend_importance", 0.05),
     }
 
-    total_weight = sum(max(float(v), 0) for v in raw_weights.values())
+    selected_days = set(state["selected_days"])
+
+    # Do not let an unselected day category affect the score.
+    if not selected_days.intersection(WEEKDAYS):
+        raw_weights["weekday"] = 0
+
+    if not selected_days.intersection(WEEKENDS):
+        raw_weights["weekend"] = 0
+
+    clean_weights = {}
+
+    for key, value in raw_weights.items():
+        try:
+            clean_weights[key] = max(float(value), 0)
+        except (TypeError, ValueError):
+            clean_weights[key] = 0
+
+    total_weight = sum(clean_weights.values())
 
     if total_weight == 0:
-        weights = {key: 1 / len(raw_weights) for key in raw_weights}
+        weights = {
+            key: 1 / len(clean_weights)
+            for key in clean_weights
+        }
     else:
         weights = {
-            key: max(float(value), 0) / total_weight
-            for key, value in raw_weights.items()
+            key: value / total_weight
+            for key, value in clean_weights.items()
         }
 
     scored = []
@@ -200,6 +325,7 @@ def score_locations(state: ScoutState):
 
         updated = dict(row)
         updated["business_fit_score"] = round(score, 1)
+
         scored.append(updated)
 
     scored.sort(
@@ -212,7 +338,13 @@ def score_locations(state: ScoutState):
     }
 
 
+# ---------------------------------------------------------------------
+# 5. Collect risk flags
+# ---------------------------------------------------------------------
+
 def analyse_risks(state: ScoutState):
+    """Collect deterministic risk flags from the location analysis."""
+
     risks = []
 
     for location in state["opportunity_scores"]:
@@ -224,22 +356,43 @@ def analyse_risks(state: ScoutState):
                 }
             )
 
-    return {"risk_flags": risks}
-
-
-def no_data(state: ScoutState):
     return {
-        "report": (
-            "There is not enough pedestrian-count data for the selected "
-            "trading period. Try a different time window or day filter."
-        )
+        "risk_flags": risks,
     }
 
 
+# ---------------------------------------------------------------------
+# Insufficient-data branch
+# ---------------------------------------------------------------------
+
+def no_data(state: ScoutState):
+    """Return a useful message when there is insufficient data."""
+
+    return {
+        "report": (
+            "There is not enough pedestrian-count data for the selected "
+            "trading period. Try a different time window or selection of "
+            "trading days."
+        ),
+    }
+
+
+# ---------------------------------------------------------------------
+# 6. Generate concise AI decision brief
+# ---------------------------------------------------------------------
+
 def generate_report(state: ScoutState):
+    """
+    Ask Gemini to interpret the deterministic evidence.
+
+    Gemini explains the result but does not calculate the ranking.
+    """
+
     results = state["opportunity_scores"]
     profile = state["business_profile"]
     quality = state["data_quality"]
+
+    selected_days = ", ".join(state["selected_days"])
 
     summary = []
 
@@ -250,7 +403,6 @@ def generate_report(state: ScoutState):
                 "business_fit_score": row["business_fit_score"],
                 "average_pedestrians": row["avg_pedestrians"],
                 "p95_pedestrians": row["p95_pedestrians"],
-                "max_pedestrians": row["max_pedestrians"],
                 "peak_intensity": row["peak_intensity"],
                 "consistency": row["traffic_consistency"],
                 "weekday_avg": row["weekday_avg"],
@@ -271,6 +423,9 @@ Business:
 Trading period:
 {state["start_hour"]}:00-{state["end_hour"]}:00
 
+Selected trading days:
+{selected_days}
+
 Business profile:
 {json.dumps(profile, indent=2)}
 
@@ -280,58 +435,104 @@ Data quality:
 Deterministic location analysis:
 {json.dumps(summary, indent=2)}
 
-Write a concise professional decision brief.
+Write ONE concise professional paragraph of approximately 70-100 words.
+
+Explain:
+- which location is the leading option,
+- the most important evidence supporting the result,
+- one important limitation,
+- and what should be investigated before making a site decision.
 
 Rules:
-- The pedestrian data is observed evidence, not a forecast of business success.
-- The business-fit score is a transparent relative decision-support index.
-- Do not invent rent, demographics, competition, zoning, customer intent,
-  or other facts not present in the supplied data.
-- Do not assume morning pedestrians are commuters. The dataset does not
-  identify pedestrian purpose.
-- Explain the leading site's score using the supplied metrics.
-- Discuss meaningful differences and risks.
-- Explicitly note that the dataset contains only four locations.
-- Use "P95 pedestrian count" as the robust peak measure. The maximum is
-  an observed extreme and should not be treated as a typical peak.
-- Keep observed facts separate from interpretation.
-
-Use these headings:
-
-Executive Summary
-Leading Opportunity
-Key Evidence
-Key Risks
-Recommended Next Steps
-Limitations
+- Write exactly one paragraph.
+- Do not use headings.
+- Do not use bullet points.
+- Do not return JSON.
+- Do not repeat every metric.
+- Focus on the most decision-relevant evidence.
+- Pedestrian counts are observed evidence, not a forecast of business success.
+- The business-fit score is a relative decision-support index, not a probability.
+- Do not invent rent, demographics, competition, zoning, customer intent or revenue.
+- Do not assume pedestrians are customers or commuters.
+- Use P95 pedestrian count rather than maximum traffic when discussing peak activity.
+- Mention that only four locations are represented in the dataset.
+- Return only the paragraph.
 """
 
     response = invoke_llm(prompt)
 
-    return {"report": response_text(response)}
+    return {
+        "report": response_text(response).strip(),
+    }
 
+
+# ---------------------------------------------------------------------
+# Graph routing
+# ---------------------------------------------------------------------
 
 def route_after_quality(state: ScoutState):
-    return (
-        "score_locations"
-        if state["data_quality"]["sufficient"]
-        else "no_data"
-    )
+    if state["data_quality"]["sufficient"]:
+        return "score_locations"
 
+    return "no_data"
+
+
+# ---------------------------------------------------------------------
+# Build LangGraph workflow
+# ---------------------------------------------------------------------
 
 graph = StateGraph(ScoutState)
 
-graph.add_node("understand_business", understand_business)
-graph.add_node("analyse_data", analyse_data)
-graph.add_node("assess_data_quality", assess_data_quality)
-graph.add_node("score_locations", score_locations)
-graph.add_node("analyse_risks", analyse_risks)
-graph.add_node("generate_report", generate_report)
-graph.add_node("no_data", no_data)
+graph.add_node(
+    "understand_business",
+    understand_business,
+)
 
-graph.add_edge(START, "understand_business")
-graph.add_edge("understand_business", "analyse_data")
-graph.add_edge("analyse_data", "assess_data_quality")
+graph.add_node(
+    "analyse_data",
+    analyse_data,
+)
+
+graph.add_node(
+    "assess_data_quality",
+    assess_data_quality,
+)
+
+graph.add_node(
+    "score_locations",
+    score_locations,
+)
+
+graph.add_node(
+    "analyse_risks",
+    analyse_risks,
+)
+
+graph.add_node(
+    "generate_report",
+    generate_report,
+)
+
+graph.add_node(
+    "no_data",
+    no_data,
+)
+
+
+graph.add_edge(
+    START,
+    "understand_business",
+)
+
+graph.add_edge(
+    "understand_business",
+    "analyse_data",
+)
+
+graph.add_edge(
+    "analyse_data",
+    "assess_data_quality",
+)
 
 graph.add_conditional_edges(
     "assess_data_quality",
@@ -342,27 +543,50 @@ graph.add_conditional_edges(
     },
 )
 
-graph.add_edge("score_locations", "analyse_risks")
-graph.add_edge("analyse_risks", "generate_report")
-graph.add_edge("generate_report", END)
-graph.add_edge("no_data", END)
+graph.add_edge(
+    "score_locations",
+    "analyse_risks",
+)
+
+graph.add_edge(
+    "analyse_risks",
+    "generate_report",
+)
+
+graph.add_edge(
+    "generate_report",
+    END,
+)
+
+graph.add_edge(
+    "no_data",
+    END,
+)
+
 
 app = graph.compile()
 
+
+# ---------------------------------------------------------------------
+# Application entry point
+# ---------------------------------------------------------------------
 
 def run_scout(
     business_type,
     start_hour=7,
     end_hour=10,
-    day_filter="All",
+    selected_days=None,
 ):
+    if selected_days is None:
+        selected_days = ALL_DAYS.copy()
+
     return app.invoke(
         {
             "question": business_type,
             "business_type": business_type,
             "start_hour": start_hour,
             "end_hour": end_hour,
-            "day_filter": day_filter,
+            "selected_days": selected_days,
             "business_profile": {},
             "location_analysis": [],
             "data_quality": {},
@@ -373,8 +597,14 @@ def run_scout(
     )
 
 
+# ---------------------------------------------------------------------
+# CLI testing
+# ---------------------------------------------------------------------
+
 if __name__ == "__main__":
-    business = input("What business are you considering opening in Sydney?\n> ")
+    business = input(
+        "What business are you considering opening in Sydney?\n> "
+    )
 
     result = run_scout(business)
 
