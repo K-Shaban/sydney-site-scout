@@ -43,7 +43,6 @@ WEEKENDS = {
     "Sunday",
 }
 
-
 # ---------------------------------------------------------------------
 # LangGraph state
 # ---------------------------------------------------------------------
@@ -113,81 +112,12 @@ def response_text(response):
 # ---------------------------------------------------------------------
 
 def understand_business(state: ScoutState):
-    """
-    Use Gemini to translate the business concept into analytical priorities.
-
-    Gemini provides business-specific importance weights.
-    It does not directly score or rank locations.
-    """
-
-    selected_days = ", ".join(state["selected_days"])
-
-    prompt = f"""
-You are defining an analytical business profile for a Sydney location study.
-
-Business concept:
-{state["business_type"]}
-
-Trading period:
-{state["start_hour"]}:00-{state["end_hour"]}:00
-
-Selected trading days:
-{selected_days}
-
-Return ONLY valid JSON using this structure:
-
-{{
-  "business_type": "...",
-  "primary_customer_period": "...",
-  "weekday_importance": 0.0,
-  "weekend_importance": 0.0,
-  "demand_importance": 0.0,
-  "consistency_importance": 0.0,
-  "peak_importance": 0.0,
-  "trend_importance": 0.0,
-  "historical_importance": 0.0,
-  "risk_tolerance": "low|medium|high"
-}}
-
-Rules:
-- All importance values must be between 0 and 1.
-- Importance values do not need to sum to 1.
-- The application will normalise the values before scoring.
-- Consider the selected trading days when assigning weekday and weekend importance.
-- Use reasonable generic commercial assumptions.
-- Do not make claims about particular Sydney locations.
-- Return JSON only.
-"""
-
-    response = invoke_llm(prompt)
-
-    content = (
-        response_text(response)
-        .replace("```json", "")
-        .replace("```", "")
-        .strip()
-    )
-
-    try:
-        profile = json.loads(content)
-
-    except (json.JSONDecodeError, TypeError):
-        # Deterministic fallback if Gemini does not return valid JSON.
-        profile = {
-            "business_type": state["business_type"],
-            "primary_customer_period": "General",
-            "weekday_importance": 0.5,
-            "weekend_importance": 0.5,
-            "demand_importance": 0.30,
-            "consistency_importance": 0.20,
-            "peak_importance": 0.15,
-            "trend_importance": 0.15,
-            "historical_importance": 0.10,
-            "risk_tolerance": "medium",
-        }
+    """Preserve the business context for later AI interpretation."""
 
     return {
-        "business_profile": profile,
+        "business_profile": {
+            "business_type": state["business_type"],
+        }
     }
 
 
@@ -261,71 +191,36 @@ def assess_data_quality(state: ScoutState):
 
 def score_locations(state: ScoutState):
     """
-    Combine deterministic location metrics with business-specific priorities.
+    Calculate a reproducible, business-neutral comparison score.
 
-    Gemini supplies the importance weights.
-    Python performs the actual scoring and ranking.
+    Each available pedestrian metric contributes equally. Gemini receives
+    the resulting evidence later and interprets it for the proposed business.
     """
 
     results = state["location_analysis"]
-    profile = state["business_profile"]
-
-    raw_weights = {
-        "demand": profile.get("demand_importance", 0.30),
-        "consistency": profile.get("consistency_importance", 0.20),
-        "peak": profile.get("peak_importance", 0.15),
-        "trend": profile.get("trend_importance", 0.15),
-        "historical": profile.get("historical_importance", 0.10),
-        "weekday": profile.get("weekday_importance", 0.05),
-        "weekend": profile.get("weekend_importance", 0.05),
-    }
-
     selected_days = set(state["selected_days"])
 
-    # Do not let an unselected day category affect the score.
-    if not selected_days.intersection(WEEKDAYS):
-        raw_weights["weekday"] = 0
+    score_fields = [
+        "demand_score",
+        "consistency_score",
+        "peak_score",
+        "trend_score",
+        "historical_score",
+    ]
 
-    if not selected_days.intersection(WEEKENDS):
-        raw_weights["weekend"] = 0
+    if selected_days.intersection(WEEKDAYS):
+        score_fields.append("weekday_score")
 
-    clean_weights = {}
-
-    for key, value in raw_weights.items():
-        try:
-            clean_weights[key] = max(float(value), 0)
-        except (TypeError, ValueError):
-            clean_weights[key] = 0
-
-    total_weight = sum(clean_weights.values())
-
-    if total_weight == 0:
-        weights = {
-            key: 1 / len(clean_weights)
-            for key in clean_weights
-        }
-    else:
-        weights = {
-            key: value / total_weight
-            for key, value in clean_weights.items()
-        }
+    if selected_days.intersection(WEEKENDS):
+        score_fields.append("weekend_score")
 
     scored = []
 
     for row in results:
-        score = (
-            row["demand_score"] * weights["demand"]
-            + row["consistency_score"] * weights["consistency"]
-            + row["peak_score"] * weights["peak"]
-            + row["trend_score"] * weights["trend"]
-            + row["historical_score"] * weights["historical"]
-            + row["weekday_score"] * weights["weekday"]
-            + row["weekend_score"] * weights["weekend"]
-        )
+        score = sum(float(row[field]) for field in score_fields) / len(score_fields)
 
         updated = dict(row)
         updated["business_fit_score"] = round(score, 1)
-
         scored.append(updated)
 
     scored.sort(
@@ -385,7 +280,7 @@ def generate_report(state: ScoutState):
     """
     Ask Gemini to interpret the deterministic evidence.
 
-    Gemini explains the result but does not calculate the ranking.
+    Gemini interprets the calculated evidence for the proposed business.
     """
 
     results = state["opportunity_scores"]
@@ -426,7 +321,7 @@ Trading period:
 Selected trading days:
 {selected_days}
 
-Business profile:
+Business context:
 {json.dumps(profile, indent=2)}
 
 Data quality:
@@ -438,7 +333,7 @@ Deterministic location analysis:
 Write ONE concise professional paragraph of approximately 70-100 words.
 
 Explain:
-- which location is the leading option,
+- whether the highest-scoring location is a sensible leading option for this business,
 - the most important evidence supporting the result,
 - one important limitation,
 - and what should be investigated before making a site decision.
@@ -451,7 +346,8 @@ Rules:
 - Do not repeat every metric.
 - Focus on the most decision-relevant evidence.
 - Pedestrian counts are observed evidence, not a forecast of business success.
-- The business-fit score is a relative decision-support index, not a probability.
+- The business-fit score is a reproducible, business-neutral comparison index, not a probability.
+- Use the business type to interpret the evidence, but do not invent new numerical scores.
 - Do not invent rent, demographics, competition, zoning, customer intent or revenue.
 - Do not assume pedestrians are customers or commuters.
 - Use P95 pedestrian count rather than maximum traffic when discussing peak activity.
