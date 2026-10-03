@@ -23,13 +23,13 @@ The application allows a user to describe a proposed business, select its tradin
 
 The user enters a business type and selects the trading period to be analysed.
 
-![Sydney Site Scout input](imgs\user-input.png)
+![Sydney Site Scout input](imgs/user-input.png)
 
 ### Location Analysis
 
 The application ranks the available locations and displays the recommended location, business-fit score, pedestrian metrics and an AI-generated decision brief.
 
-![Sydney Site Scout result](imgs\user-response.png)
+![Sydney Site Scout result](imgs/user-response.png)
 
 The numerical ranking is calculated in Python, while Gemini interprets the results and provides a concise explanation.
 
